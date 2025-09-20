@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Reels Auto‑Scraper",
+  "version": "1.2.0",
+  "description": "Automatically steps through Instagram Reels, collects URL + caption, and builds a local searchable database with JSON export.",
+  "action": { "default_title": "Reels Auto‑Scraper", "default_popup": "popup.html" },
+  "permissions": ["storage", "scripting", "tabs", "downloads"],
+  "host_permissions": ["https://www.instagram.com/*"],
+  "background": { "service_worker": "background.js" },
+  
+  "content_scripts": [
+    {
+      "matches": ["https://www.instagram.com/reels/*", "https://www.instagram.com/reel/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "dashboard.html"
+}
