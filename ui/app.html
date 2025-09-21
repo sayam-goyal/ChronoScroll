@@ -1,0 +1,44 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChronoScroll App</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="boot" class="boot">
+    <div class="scanline"></div>
+    <div class="pixlogo">
+      <svg width="64" height="64" viewBox="0 0 24 24" aria-hidden="true">
+        <polygon points="12,2 22,7 12,12 2,7" fill="#8f6fff"/>
+        <polygon points="12,12 22,7 22,17 12,22" fill="#24cc8f"/>
+        <polygon points="12,12 2,7 2,17 12,22" fill="#1f2836"/>
+      </svg>
+    </div>
+    <div class="title">CHRONOSCROLL</div>
+    <div class="subtitle">initializing…</div>
+  </div>
+
+  <div id="app" class="hidden pix-layout">
+    <aside class="sidebar">
+      <div class="brand" id="brand">CHRONOSCROLL</div>
+      <nav>
+        <button data-route="dashboard" class="active">▣ DASHBOARD</button>
+        <button data-route="onboarding">▣ ONBOARDING</button>
+        <button data-route="add">▣ ADD ITEM</button>
+        <button data-route="search">▣ SEARCH</button>
+        <button data-route="settings">▣ SETTINGS</button>
+        <button data-route="export">▣ EXPORT</button>
+        <button data-route="bulk">▣ BULK CRAWL</button>
+        <button data-route="about">▣ ABOUT</button>
+        <button data-route="login">▣ LOGIN</button>
+      </nav>
+      <div class="foot">v1.5.0</div>
+    </aside>
+    <main id="main"></main>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

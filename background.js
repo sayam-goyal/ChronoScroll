@@ -1,85 +1,106 @@
-// MV3-safe promise wrappers around chrome.* callbacks
-const p = {
-  windowsCreate: (data) => new Promise((res, rej) => { try { chrome.windows.create(data, w => { const e = chrome.runtime.lastError; e ? rej(e) : res(w); }); } catch (e) { rej(e); } }),
-  windowsUpdate: (id, data) => new Promise((res, rej) => { try { chrome.windows.update(id, data, w => { const e = chrome.runtime.lastError; e ? rej(e) : res(w); }); } catch (e) { rej(e); } }),
-  tabsQuery: (query) => new Promise((res, rej) => { try { chrome.tabs.query(query, r => { const e = chrome.runtime.lastError; e ? rej(e) : res(r); }); } catch (e) { rej(e); } }),
-  tabsGet: (id) => new Promise((res, rej) => { try { chrome.tabs.get(id, t => { const e = chrome.runtime.lastError; e ? rej(e) : res(t); }); } catch (e) { rej(e); } }),
-  tabsUpdate: (id, data) => new Promise((res, rej) => { try { chrome.tabs.update(id, data, t => { const e = chrome.runtime.lastError; e ? rej(e) : res(t); }); } catch (e) { rej(e); } }),
-  tabsSend: (id, msg) => new Promise((res, rej) => { try { chrome.tabs.sendMessage(id, msg, r => { const e = chrome.runtime.lastError; e ? rej(e) : res(r); }); } catch (e) { rej(e); } })
-};
 
-let currentJob = null; // { tabId, windowId, delayMs, maxCount, jitterMs, startedAt }
+import {getSettings, setSession, getSession, pushItem} from './libs/storage.js';
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'START_SCRAPE') {
-    startScrapeJob(msg.config)
-      .then(() => sendResponse({ ok: true }))
-      .catch(err => sendResponse({ ok: false, error: String(err?.message || err) }));
-    return true; // keep message port open during async work
+const PLATFORM_URLS = { youtube: 'https://www.youtube.com/shorts', instagram: 'https://www.instagram.com/reels/' };
+let scrapeWindowId = null; let scrapeTabId = null; let bulkQueue = []; let bulkActive = false;
+
+async function openScrapeWindow(platform, minimized=true) {
+  const url = PLATFORM_URLS[platform] || PLATFORM_URLS.youtube;
+  return new Promise(resolve => {
+    chrome.windows.create({url, state:minimized?'minimized':'normal', focused:!minimized, type:'normal'}, async (win) => {
+      try { await chrome.windows.update(win.id, {state:minimized?'minimized':'normal', focused:false}); } catch{}
+      scrapeWindowId = win.id; scrapeTabId = win.tabs[0].id; resolve({win, tabId: scrapeTabId});
+    });
+  });
+}
+async function closeScrapeWindow() { if (scrapeWindowId!=null){ try{ await chrome.windows.remove(scrapeWindowId);}catch{} } scrapeWindowId=null; scrapeTabId=null; }
+
+function onceTabComplete(tabId) {
+  return new Promise((resolve) => {
+    function listener(id, info) {
+      if (id === tabId && info.status === 'complete') {
+        chrome.tabs.onUpdated.removeListener(listener); resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+}
+
+async function waitForContentReady(tabId, platform, tries=20) {
+  for (let i=0;i<tries;i++) {
+    try {
+      const resp = await new Promise(res => chrome.tabs.sendMessage(tabId, {type:'PING'}, res));
+      if (resp && resp.ok) return true;
+    } catch {}
+    await new Promise(r => setTimeout(r, 200));
   }
-  if (msg?.type === 'STOP_SCRAPE') {
-    stopScrapeJob()
-      .then(() => sendResponse({ ok: true }))
-      .catch(err => sendResponse({ ok: false, error: String(err) }));
-    return true;
+  try {
+    await chrome.scripting.executeScript({target:{tabId}, files:['libs/utils.js','libs/storage.js','libs/messaging.js', platform==='instagram'?'content/instagram.js':'content/youtube_shorts.js']});
+  } catch {}
+  try {
+    const resp2 = await new Promise(res => chrome.tabs.sendMessage(tabId, {type:'PING'}, res));
+    if (resp2 && resp2.ok) return true;
+  } catch {}
+  return false;
+}
+
+async function startAutoscroll({platform, delayMs, minimized}) {
+  const sess = await getSession(); if (sess.running) return sess;
+  const {tabId} = await openScrapeWindow(platform, minimized);
+  await setSession({running:true, platform, delayMs, minimized, tabId, startedAt: Date.now(), items:0});
+  await onceTabComplete(tabId);
+  await waitForContentReady(tabId, platform);
+  await new Promise(res => chrome.tabs.sendMessage(tabId, {type:'CONTENT_START', payload:{platform, delayMs}}, res));
+  return await getSession();
+}
+async function stopAutoscroll(){ const sess = await getSession(); if (!sess.running) return sess; try{ if(scrapeTabId) chrome.tabs.sendMessage(scrapeTabId,{type:'CONTENT_STOP'});}catch{} await setSession({running:false}); await closeScrapeWindow(); return await getSession(); }
+
+chrome.windows.onRemoved.addListener(async (wid)=>{ if (wid===scrapeWindowId){ await setSession({running:false}); scrapeWindowId=null; scrapeTabId=null; } });
+
+async function bulkNext(platform, delayMs) {
+  if (!bulkQueue.length) { bulkActive=false; return; }
+  const url = bulkQueue.shift();
+  try {
+    await chrome.tabs.update(scrapeTabId, {url});
+    await onceTabComplete(scrapeTabId);
+    await waitForContentReady(scrapeTabId, platform);
+    chrome.tabs.sendMessage(scrapeTabId, {type:'SCRAPE_ONCE', payload:{platform}}, (resp)=>{
+      setTimeout(()=> bulkNext(platform, delayMs), Math.max(300, delayMs));
+    });
+  } catch(e) {
+    setTimeout(()=> bulkNext(platform, delayMs), Math.max(300, delayMs));
   }
-  if (msg?.type === 'OPEN_DASHBOARD') {
-    const url = chrome.runtime.getURL('dashboard.html');
-    chrome.tabs.create({ url });
-    sendResponse({ ok: true });
-    return false;
-  }
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  (async () => {
+    switch (msg?.type) {
+      case 'START_AUTOSCROLL': {
+        const s = await getSettings(); const cfg = Object.assign({}, s, msg.payload||{});
+        const started = await startAutoscroll(cfg); sendResponse({ok:true, data: started}); break;
+      }
+      case 'STOP_AUTOSCROLL': { const stopped = await stopAutoscroll(); sendResponse({ok:true, data: stopped}); break; }
+      case 'SAVE_SCRAPE_ITEM': {
+        const count = await pushItem(msg.payload);
+        const sess = await getSession(); if (sess.running){ sess.items=(sess.items||0)+1; await setSession(sess); }
+        sendResponse({ok:true, data:{count}}); break;
+      }
+      case 'GET_SESSION': sendResponse({ok:true, data: await getSession()}); break;
+      case 'BULK_SCRAPE_START': {
+        const {urls, platform, delayMs=900, minimized=true} = msg.payload||{};
+        if (!urls || !urls.length) { sendResponse({ok:false, error:'No URLs provided'}); break; }
+        if (!scrapeTabId) { await openScrapeWindow(platform||'youtube', minimized); await onceTabComplete(scrapeTabId); await waitForContentReady(scrapeTabId, platform||'youtube'); }
+        bulkQueue = urls.slice(); bulkActive = true;
+        sendResponse({ok:true, data:{count: bulkQueue.length}});
+        bulkNext(platform||'youtube', delayMs);
+        break;
+      }
+      default: sendResponse({ok:false, error:'Unknown message'});
+    }
+  })();
+  return true;
 });
 
-// Start: find an existing reels tab, or open one
-async function startScrapeJob(config) {
-  const reelsTabs = await p.tabsQuery({ url: ['https://www.instagram.com/reels/*', 'https://www.instagram.com/reel/*'] });
-  let targetTab = reelsTabs?.[0];
-  let win;
-
-  if (!targetTab) {
-    win = await p.windowsCreate({ url: 'https://www.instagram.com/reels/', focused: true });
-    const tabs = await p.tabsQuery({ windowId: win.id, active: true });
-    targetTab = tabs?.[0];
-    if (!targetTab?.id) throw new Error('Could not obtain tab id after window creation');
-  } else {
-    await p.windowsUpdate(targetTab.windowId, { focused: true });
-  }
-
-  const delayMs  = Math.max(250, (config?.delaySec ?? 1) * 1000); // default 1s
-  const jitterMs = Math.max(0, (config?.jitterSec ?? 0) * 1000);  // default 0
-  const maxCount = Math.max(1, config?.maxCount ?? 200);
-
-  currentJob = { tabId: targetTab.id, windowId: targetTab.windowId, delayMs, jitterMs, maxCount, startedAt: Date.now() };
-
-  await waitForContentScript(targetTab.id, 'https://www.instagram.com/reels/');
-  // Ensure we’re inside a reel (not the grid) before starting
-  await p.tabsSend(targetTab.id, { type: 'CONTENT_PREPARE' });
-  await p.tabsSend(targetTab.id, { type: 'CONTENT_START', job: currentJob });
-}
-
-async function waitForContentScript(tabId, expectedUrl, timeoutMs = 20000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const t = await p.tabsGet(tabId);
-      const url = t.url || '';
-      const okPath = /https:\/\/www\.instagram\.com\/(reels|reel)\//.test(url);
-      if (!okPath && expectedUrl) await p.tabsUpdate(tabId, { url: expectedUrl });
-      const ping = await p.tabsSend(tabId, { type: 'PING' });
-      if (ping && (ping.ok || ping.running !== undefined)) return;
-    } catch (_) { /* content script not yet ready; keep polling */ }
-    await new Promise(r => setTimeout(r, 400));
-  }
-  throw new Error('Content script never became ready (are you on the login page?)');
-}
-
-async function stopScrapeJob() {
-  if (!currentJob) return;
-  try { await p.tabsSend(currentJob.tabId, { type: 'CONTENT_STOP' }); } catch {}
-  currentJob = null;
-}
-
-// Clean up if the target tab/window closes
-chrome.tabs.onRemoved.addListener((tabId) => { if (currentJob?.tabId === tabId) currentJob = null; });
-chrome.windows.onRemoved.addListener((windowId) => { if (currentJob?.windowId === windowId) currentJob = null; });
+async function updateBadge(){ const s = await getSession(); if (s.running){ chrome.action.setBadgeText({text: 'ON'}); chrome.action.setBadgeBackgroundColor({color: '#34d399'});} else { chrome.action.setBadgeText({text:''}); } }
+chrome.alarms.create('badge',{periodInMinutes:0.2}); chrome.alarms.onAlarm.addListener(a=>{ if(a.name==='badge') updateBadge(); });
+chrome.runtime.onInstalled.addListener(()=>updateBadge()); chrome.runtime.onStartup.addListener(()=>updateBadge());

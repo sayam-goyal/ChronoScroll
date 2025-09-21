@@ -1,0 +1,66 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChronoScroll</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app" class="crt">
+    <header class="pixcard row space">
+      <div class="logo row">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <polygon points="12,2 22,7 12,12 2,7" fill="#8f6fff"/>
+          <polygon points="12,12 22,7 22,17 12,22" fill="#24cc8f"/>
+          <polygon points="12,12 2,7 2,17 12,22" fill="#1f2836"/>
+        </svg>
+        <span id="brand">ChronoScroll</span>
+      </div>
+      <a class="plink" href="app.html" target="_blank">OPEN APP ▣</a>
+    </header>
+
+    <section class="pixcard">
+      <div class="grid">
+        <label class="row">Platform
+          <select id="platform">
+            <option value="youtube">YouTube Shorts</option>
+            <option value="instagram">Instagram Reels</option>
+          </select>
+        </label>
+        <label class="row">Delay (ms)
+          <input type="number" id="delay" min="250" step="50" value="900"/>
+        </label>
+        <label class="row">
+          <input type="checkbox" id="minimized" checked><span>Run minimized</span>
+        </label>
+      </div>
+      <div class="row" style="gap:8px; margin-top:8px;">
+        <button id="start" class="btn primary">START ▶</button>
+        <button id="stop" class="btn">STOP ■</button>
+      </div>
+    </section>
+
+    <section class="pixcard row space">
+      <div id="status" class="badge">STATUS: IDLE</div>
+      <div id="count" class="badge">ITEMS: 0</div>
+    </section>
+
+    <section class="pixcard">
+      <h4>Manual Add</h4>
+      <p class="hint">Paste a Reel/Short URL. Optionally add the username and caption. Separate tags by commas.</p>
+      <div class="grid">
+        <input type="text" id="m-url" placeholder="https://www.instagram.com/reel/… or https://www.youtube.com/shorts/…"/>
+        <input type="text" id="m-user" placeholder="username (optional)"/>
+        <textarea id="m-cap" placeholder="caption/description (optional)"></textarea>
+        <input type="text" id="m-tags" placeholder="tags (optional, comma-separated)"/>
+        <button class="btn" id="m-save">Add to Database</button>
+      </div>
+    </section>
+
+    <footer class="hint">Tip: 800–1500ms is stable; 250–700ms is aggressive.</footer>
+  </div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

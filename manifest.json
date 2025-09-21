@@ -1,18 +1,69 @@
 {
+  "name": "ChronoScroll - Auto-Scroll & Scrape Reels/Shorts",
+  "description": "ChronoScroll auto-scrolls Instagram Reels and YouTube Shorts, capturing captions, usernames, URLs, and tags. Pixel/voxel UI with manual add, bulk crawl, and minimized background scraping.",
+  "version": "1.5.0",
   "manifest_version": 3,
-  "name": "Reels Auto-Scraper",
-  "version": "1.3.0",
-  "description": "Automatically steps through Instagram Reels, collects URL + caption, and builds a local searchable database with JSON export.",
-  "action": { "default_title": "Reels Auto-Scraper", "default_popup": "popup.html" },
-  "permissions": ["storage", "scripting", "tabs", "downloads", "activeTab"],
-  "host_permissions": ["https://www.instagram.com/*"],
-  "background": { "service_worker": "background.js" },
+  "minimum_chrome_version": "114",
+  "permissions": [
+    "storage",
+    "scripting",
+    "tabs",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://www.instagram.com/*",
+    "https://www.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "ChronoScroll",
+    "default_popup": "ui/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "ui/app.html",
   "content_scripts": [
     {
-      "matches": ["https://www.instagram.com/reels/*", "https://www.instagram.com/reel/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://www.youtube.com/shorts/*",
+        "https://www.youtube.com/shorts",
+        "https://www.youtube.com/*shorts*"
+      ],
+      "js": [
+        "libs/utils.js",
+        "libs/storage.js",
+        "libs/messaging.js",
+        "content/youtube_shorts.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.instagram.com/reel/*",
+        "https://www.instagram.com/reels/*",
+        "https://www.instagram.com/*reels*"
+      ],
+      "js": [
+        "libs/utils.js",
+        "libs/storage.js",
+        "libs/messaging.js",
+        "content/instagram.js"
+      ],
       "run_at": "document_idle"
     }
-  ],
-  "options_page": "dashboard.html"
+  ]
 }
