@@ -15,6 +15,8 @@ Worth it? Detected audio keywords line up with your listed preferences? Into the
 
 Oh, yeah. About the tags. Not all videos have them, and some can be misleading, so we had to implement a fix where if the number of tags is either 0 or greater than 15, ChronoScroll automatically deletes any currently existing tags of the video and uses the transcription to automatically generate more accurate tags. Also, Instagram Reels was out for blood during the development process, using our own tools against us by freezing feeds and creating jittery feeds whenever the in-app reel scroll rate exceeded somewhere between 200-300 reels per minute. We had to do some performance profiling to adjust the latency metrics accordingly, learning a lot about telemetry, computer networking, and web servers in the process.
 
+Our team also dealt with challenges related to working with unfamiliar APIs that would often block us out, demanding payment for uses after free trials expired. Our solution was to write a script to bulk-create accounts and run the processes in parallel for improved speed. Audio could also be too long for the transcription API to handle, so we added in edge case handling where the extension would tag audio over 1 minute as being marked for splitting, and send it to multiple sources for transcription before merging the text into a user-readable summary.
+
 ### Tech Stack
 - Next.js (front-end user interface)
 - NodeJS & SignalDB (local database for storing Instagram reels and YouTube shorts captures.
@@ -26,7 +28,8 @@ William created a web automation testing tool that uses Selenium to automaticall
 ### Data Analysis and Back-End API
 Ray and Sayam created a backend data analysis framework that loads a JSON file and processes a transcript for each reel/short. Ray worked on the Python code to create a summary of the reels at the top of the curated feed, while Sayam processed the transcript using a JavaScript API and handled the unfortunately common case of reels have spam-like tags or no tags at all.
 
-### Scaling
+### Scaling and Future Plans
+We plan to submit this extension to the Chrome Web Store, and hope that this tool will be useful to other users in the future for treating reels/short-form content as a searchable database. Sure, it might be mostly memes and prank-related content, but the audio transcriptions, aggregated descriptions, and user-relevant tags can make it a lot easier to navigate an otherwise junk-infested space on the internet. Our database can handle an estimated 150-200 concurrent users, and we plan to port it to another service like Vercel for scaling in the near future, targeting 500+ users.
 
 ### FAQ
 **Why is the database populating so slowly?**
