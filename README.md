@@ -36,4 +36,4 @@ _The aggregator's latency is set to a dynamic rate between 800 ms to 1500 ms bas
 _Try clearing your browser cache or pruning entries in the database. Some short-form content can have excessively long lists of tags for the purpose of search-engine optimization (SEO). ChronoScroll lets you fine-tune metadata like tags, timestamps, and captions to speed up in-app search indexing._
 
 **How do I install this extension?**
-Open the browser of your choice (preferably the 31 GB memory hog, Google Chrome) and enable developer mode for extensions. Then, load the decompressed ZIP file as an `unpacked extension`. Click on the ChronoScroll logo to open the settings page and start configuring your feed.
+_Open the browser of your choice (preferably the 31 GB memory hog, Google Chrome) and enable developer mode for extensions. Then, load the decompressed ZIP file as an `unpacked extension`. Click on the ChronoScroll logo to open the settings page and start configuring your feed._
