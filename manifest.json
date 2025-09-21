@@ -1,7 +1,7 @@
 {
-  "name": "ChronoScroll - Auto-Scroll & Scrape Reels/Shorts",
-  "description": "ChronoScroll auto-scrolls YouTube Shorts & Instagram Reels and saves URL, author, caption, and tags to a local database. Full voxel UI with Manual Add, Search, Export, Settings, Bulk Crawl, and Login.",
-  "version": "1.8.0",
+  "name": "ChronoScroll - Auto-Scroll & Summarize Reels/Shorts",
+  "description": "ChronoScroll auto-scrolls YouTube Shorts & Instagram Reels, captures data, generates transcripts, and summarizes with Gemini. Full voxel UI with Interests & Summary dashboards.",
+  "version": "1.9.1",
   "manifest_version": 3,
   "minimum_chrome_version": "114",
   "permissions": [
@@ -13,7 +13,8 @@
   ],
   "host_permissions": [
     "https://www.instagram.com/*",
-    "https://www.youtube.com/*"
+    "https://www.youtube.com/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background.js",

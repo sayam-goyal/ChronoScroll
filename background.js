@@ -1,8 +1,11 @@
 
-import {pushItem, getSettings, setSession, getSession} from './libs/storage.js';
+import {pushItem, getSettings, setSession, getSession, getDB, updateItem} from './libs/storage.js';
+import { summarizeTranscript } from './libs/ai.js';
 
 const PLATFORM_URLS = { youtube: 'https://www.youtube.com/shorts', instagram: 'https://www.instagram.com/reels/' };
-let scrapeWindowId = null; let scrapeTabId = null; let bulkQueue = []; let bulkActive = false;
+let scrapeWindowId = null; let scrapeTabId = null;
+let bulkQueue = []; let bulkActive = false;
+let sumQueue = []; let sumActive = false;
 
 async function openScrapeWindow(platform, minimized=true) {
   const url = PLATFORM_URLS[platform] || PLATFORM_URLS.youtube;
@@ -25,7 +28,6 @@ function onceTabComplete(tabId) {
     chrome.tabs.onUpdated.addListener(listener);
   });
 }
-
 async function waitForContentReady(tabId, platform, tries=20) {
   for (let i=0;i<tries;i++) {
     try {
@@ -42,6 +44,14 @@ async function waitForContentReady(tabId, platform, tries=20) {
     if (resp2 && resp2.ok) return true;
   } catch {}
   return false;
+}
+
+async function ensureYTTab(minimized=true){
+  if (scrapeTabId) return scrapeTabId;
+  await openScrapeWindow('youtube', minimized); 
+  await onceTabComplete(scrapeTabId);
+  await waitForContentReady(scrapeTabId, 'youtube');
+  return scrapeTabId;
 }
 
 async function startAutoscroll({platform, delayMs=900, minimized=true}){
@@ -72,6 +82,44 @@ async function bulkNext(platform, delayMs) {
   }
 }
 
+async function fetchTranscriptForYT(url, minimized=true){
+  const tabId = await ensureYTTab(minimized);
+  await chrome.tabs.update(tabId, {url}); await onceTabComplete(tabId);
+  await waitForContentReady(tabId, 'youtube');
+  try {
+    const data = await new Promise(res => chrome.tabs.sendMessage(tabId, {type:'GET_TRANSCRIPT'}, res));
+    return data?.text || '';
+  } catch { return ''; }
+}
+
+async function summarizeNext(){
+  if (!sumQueue.length){ sumActive=false; return; }
+  const id = sumQueue.shift();
+  try {
+    const db = await getDB(); const item = db.find(i=>i.id===id);
+    if (!item) { setTimeout(summarizeNext, 50); return; }
+    let transcript = item.transcript || '';
+    if (!transcript && item.platform === 'youtube'){
+      transcript = await fetchTranscriptForYT(item.url, true);
+      if (transcript && transcript.length) await updateItem(item.id, {transcript});
+    }
+    const sourceText = transcript || item.caption || '';
+    if (!sourceText){ setTimeout(summarizeNext, 50); return; }
+    const s = await getSettings();
+    const prefs = Object.entries(s.categories||{}).filter(([,v])=>v).map(([k])=>k).join(', ');
+    const sum = await summarizeTranscript(sourceText, prefs);
+    await updateItem(item.id, {summary: sum.summary||'', topics: sum.topics||[], genres: sum.genres||[], key_quotes: sum.key_quotes||[], ai_tags: sum.tags||[], suitability: sum.suitability||'neutral'});
+  } catch (e) {
+    // ignore individual failure
+  }
+  setTimeout(summarizeNext, 200);
+}
+
+function startSummarize(ids){
+  sumQueue.push(...ids);
+  if (!sumActive){ sumActive = true; summarizeNext(); }
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     switch (msg?.type) {
@@ -81,9 +129,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       case 'STOP_AUTOSCROLL': { const stopped = await stopAutoscroll(); sendResponse({ok:true, data: stopped}); break; }
       case 'SAVE_SCRAPE_ITEM': {
-        const count = await pushItem(msg.payload);
-        const sess = await getSession(); if (sess.running){ sess.items=(sess.items||0)+1; await setSession(sess); }
-        sendResponse({ok:true, data:{count}}); break;
+        const res = await pushItem(msg.payload);
+        const sess = await getSession();
+        if (sess.running && res?.added){ sess.items=(sess.items||0)+1; await setSession(sess); }
+        sendResponse({ok:true, data:res}); break;
       }
       case 'GET_SESSION': sendResponse({ok:true, data: await getSession()}); break;
       case 'BULK_SCRAPE_START': {
@@ -94,6 +143,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ok:true, data:{count: bulkQueue.length}});
         bulkNext(platform||'youtube', delayMs);
         break;
+      }
+      case 'SUMMARIZE_ALL': {
+        const db = await getDB(); startSummarize(db.map(x=>x.id)); sendResponse({ok:true, count: db.length}); break;
+      }
+      case 'SUMMARIZE_IDS': {
+        const ids = msg.payload?.ids || []; if (!ids.length) { sendResponse({ok:false, error:'No ids'}); break; }
+        startSummarize(ids); sendResponse({ok:true, count: ids.length}); break;
       }
       default: sendResponse({ok:false, error:'Unknown message'});
     }

@@ -1,5 +1,4 @@
 
-// ui_utils.js — module helpers for UI pages
 export function downloadJSON(filename, dataObj){
   const blob = new Blob([JSON.stringify(dataObj, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);

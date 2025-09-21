@@ -1,5 +1,4 @@
 
-// storage.js — module for background and UI pages
 export const DB_KEY = 'chronoscroll.database';
 export const SETTINGS_KEY = 'chronoscroll.settings';
 export const SESSION_KEY = 'chronoscroll.session';
@@ -9,12 +8,17 @@ function uid(){ return Math.random().toString(36).slice(2) + Date.now().toString
 async function get(key){ return new Promise(res => chrome.storage.local.get(key, v => res(v[key]))); }
 async function set(obj){ return new Promise(res => chrome.storage.local.set(obj, res)); }
 
+function extractVid(url){ try { const m = (url||'').match(/\/shorts\/([A-Za-z0-9_-]{5,})/); return m?m[1]:null; } catch{ return null; } }
+
 export async function pushItem(item){
   const db = (await get(DB_KEY)) || [];
   if (!item.id) item.id = uid();
-  const recent = db.slice(-12);
-  if (!recent.find(x => x.url===item.url && (x.caption||'')===(item.caption||''))) db.push(item);
-  await set({[DB_KEY]: db}); return db.length;
+  if (!item.vid && item.url) item.vid = extractVid(item.url);
+  const normalizedCaption = (item.caption||'').trim();
+  const isDup = db.slice(-150).some(x => (x.vid && item.vid && x.vid===item.vid) || (x.url===item.url && (x.caption||'').trim()===normalizedCaption));
+  let added=false;
+  if (!isDup){ db.push(item); added=true; await set({[DB_KEY]: db}); } else { await set({[DB_KEY]: db}); }
+  return {added, total: db.length};
 }
 export async function getDB(){ return (await get(DB_KEY)) || []; }
 export async function clearDB(){ await set({[DB_KEY]: []}); }
@@ -27,7 +31,7 @@ export async function deleteItem(id){
 }
 
 export async function getSettings(){
-  const defaults = { platform:'youtube', autoscroll:false, delayMs: 900, minimized:true, appearance:{theme:'dark', density:'comfortable'}, categories:{} };
+  const defaults = { platform:'youtube', autoscroll:false, delayMs: 900, minimized:true, appearance:{theme:'dark', density:'comfortable'}, categories:{}, aiKey: '' };
   const s = (await get(SETTINGS_KEY)) || {}; return Object.assign({}, defaults, s);
 }
 export async function saveSettings(s){ const cur = await getSettings(); await set({[SETTINGS_KEY]: Object.assign({}, cur, s)}); }
