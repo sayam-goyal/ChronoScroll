@@ -1,5 +1,4 @@
 
-// messaging.js
 export function sendMessage(type, payload={}) {
   return new Promise(resolve => chrome.runtime.sendMessage({type, payload}, resolve));
 }

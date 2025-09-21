@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html>
 <head>
@@ -48,8 +47,11 @@
     </section>
 
     <section class="pixcard">
-      <h4>Manual Add</h4>
-      <p class="hint">Paste a Reel/Short URL. Optionally add the username and caption. Separate tags by commas.</p>
+      <div class="row space">
+        <h4 style="margin:0;">Manual Add</h4>
+        <button class="btn" id="detect">Detect from Current Tab</button>
+      </div>
+      <p class="hint">Open a Reel/Short in your active tab; click “Detect” to auto-fill (URL, username, caption, tags). Then click “Add to Database”.</p>
       <div class="grid">
         <input type="text" id="m-url" placeholder="https://www.instagram.com/reel/… or https://www.youtube.com/shorts/…"/>
         <input type="text" id="m-user" placeholder="username (optional)"/>

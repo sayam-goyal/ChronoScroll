@@ -1,7 +1,7 @@
 {
   "name": "ChronoScroll - Auto-Scroll & Scrape Reels/Shorts",
-  "description": "ChronoScroll auto-scrolls Instagram Reels and YouTube Shorts, capturing captions, usernames, URLs, and tags. Pixel/voxel UI with manual add, bulk crawl, and minimized background scraping.",
-  "version": "1.5.0",
+  "description": "ChronoScroll auto-scrolls Instagram Reels and YouTube Shorts, capturing captions, usernames, URLs, and tags. Pixel/voxel UI with manual add, bulk crawl, minimized background scraping, and one-click detection from current tab.",
+  "version": "1.6.1",
   "manifest_version": 3,
   "minimum_chrome_version": "114",
   "permissions": [
