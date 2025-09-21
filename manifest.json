@@ -1,7 +1,7 @@
 {
   "name": "ChronoScroll - Auto-Scroll & Scrape Reels/Shorts",
-  "description": "ChronoScroll auto-scrolls Instagram Reels and YouTube Shorts, capturing captions, usernames, URLs, and tags. Pixel/voxel UI with manual add, bulk crawl, minimized background scraping, and one-click detection from current tab.",
-  "version": "1.6.1",
+  "description": "ChronoScroll auto-scrolls YouTube Shorts & Instagram Reels and saves URL, author, caption, and tags to a local database. Full voxel UI with Manual Add, Search, Export, Settings, Bulk Crawl, and Login.",
+  "version": "1.8.0",
   "manifest_version": 3,
   "minimum_chrome_version": "114",
   "permissions": [
@@ -39,28 +39,23 @@
   "content_scripts": [
     {
       "matches": [
+        "https://www.youtube.com/*shorts*",
         "https://www.youtube.com/shorts/*",
-        "https://www.youtube.com/shorts",
-        "https://www.youtube.com/*shorts*"
+        "https://www.youtube.com/shorts"
       ],
       "js": [
-        "libs/utils.js",
-        "libs/storage.js",
-        "libs/messaging.js",
+        "libs/cs_utils.js",
         "content/youtube_shorts.js"
       ],
       "run_at": "document_idle"
     },
     {
       "matches": [
-        "https://www.instagram.com/reel/*",
-        "https://www.instagram.com/reels/*",
+        "https://www.instagram.com/*reel*",
         "https://www.instagram.com/*reels*"
       ],
       "js": [
-        "libs/utils.js",
-        "libs/storage.js",
-        "libs/messaging.js",
+        "libs/cs_utils.js",
         "content/instagram.js"
       ],
       "run_at": "document_idle"

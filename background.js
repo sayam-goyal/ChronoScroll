@@ -1,5 +1,5 @@
 
-import {getSettings, setSession, getSession, pushItem} from './libs/storage.js';
+import {pushItem, getSettings, setSession, getSession} from './libs/storage.js';
 
 const PLATFORM_URLS = { youtube: 'https://www.youtube.com/shorts', instagram: 'https://www.instagram.com/reels/' };
 let scrapeWindowId = null; let scrapeTabId = null; let bulkQueue = []; let bulkActive = false;
@@ -9,7 +9,7 @@ async function openScrapeWindow(platform, minimized=true) {
   return new Promise(resolve => {
     chrome.windows.create({url, state:minimized?'minimized':'normal', focused:!minimized, type:'normal'}, async (win) => {
       try { await chrome.windows.update(win.id, {state:minimized?'minimized':'normal', focused:false}); } catch{}
-      scrapeWindowId = win.id; scrapeTabId = win.tabs[0].id; resolve({win, tabId: scrapeTabId});
+      scrapeWindowId = win.id; scrapeTabId = win.tabs?.[0]?.id || null; resolve({win, tabId: scrapeTabId});
     });
   });
 }
@@ -17,7 +17,7 @@ async function closeScrapeWindow() { if (scrapeWindowId!=null){ try{ await chrom
 
 function onceTabComplete(tabId) {
   return new Promise((resolve) => {
-    function listener(id, info) {
+    function listener(id, info, tab) {
       if (id === tabId && info.status === 'complete') {
         chrome.tabs.onUpdated.removeListener(listener); resolve();
       }
@@ -35,7 +35,7 @@ async function waitForContentReady(tabId, platform, tries=20) {
     await new Promise(r => setTimeout(r, 200));
   }
   try {
-    await chrome.scripting.executeScript({target:{tabId}, files:['libs/utils.js','libs/storage.js','libs/messaging.js', platform==='instagram'?'content/instagram.js':'content/youtube_shorts.js']});
+    await chrome.scripting.executeScript({target:{tabId}, files:['libs/cs_utils.js', platform==='instagram'?'content/instagram.js':'content/youtube_shorts.js']});
   } catch {}
   try {
     const resp2 = await new Promise(res => chrome.tabs.sendMessage(tabId, {type:'PING'}, res));
@@ -44,7 +44,7 @@ async function waitForContentReady(tabId, platform, tries=20) {
   return false;
 }
 
-async function startAutoscroll({platform, delayMs, minimized}) {
+async function startAutoscroll({platform, delayMs=900, minimized=true}){
   const sess = await getSession(); if (sess.running) return sess;
   const {tabId} = await openScrapeWindow(platform, minimized);
   await setSession({running:true, platform, delayMs, minimized, tabId, startedAt: Date.now(), items:0});
@@ -103,4 +103,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 async function updateBadge(){ const s = await getSession(); if (s.running){ chrome.action.setBadgeText({text: 'ON'}); chrome.action.setBadgeBackgroundColor({color: '#34d399'});} else { chrome.action.setBadgeText({text:''}); } }
 chrome.alarms.create('badge',{periodInMinutes:0.2}); chrome.alarms.onAlarm.addListener(a=>{ if(a.name==='badge') updateBadge(); });
-chrome.runtime.onInstalled.addListener(()=>updateBadge()); chrome.runtime.onStartup.addListener(()=>updateBadge());
+chrome.runtime.onInstalled.addListener(()=>updateBadge()); chrome.runtime.onStartup.addListener(async ()=>{
+  updateBadge();
+  const s = await getSettings();
+  if (s.autoscroll){ try { await startAutoscroll({platform: s.platform||'youtube', delayMs: s.delayMs||900, minimized: s.minimized!==false}); } catch {} }
+});

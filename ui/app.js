@@ -1,6 +1,6 @@
 
 import {getDB, clearDB, getSettings, saveSettings, getLogin, saveLogin, updateItem, pushItem, PRESET_TAGS, deleteItem} from '../libs/storage.js';
-import {downloadJSON} from '../libs/utils.js';
+import {downloadJSON} from '../libs/ui_utils.js';
 
 const main = document.getElementById('main'); const nav = document.querySelector('.sidebar nav'); const boot = document.getElementById('boot'); const app = document.getElementById('app'); const brand = document.getElementById('brand');
 function applyTheme(theme){ document.documentElement.setAttribute('data-theme', theme==='light'?'light':'dark'); }
@@ -12,7 +12,8 @@ async function renderDashboard(){
   const db = await getDB(); const s = await getSettings(); const counts = db.reduce((a,x)=>{a[x.platform]=(a[x.platform]||0)+1; return a;},{});
   main.innerHTML = `
     <div class="grid cols-3">
-      <div class="card"><h3>Quick Start</h3><p>Open the popup and click <span class="badge">START ▶</span>. Auto-scroll ${s.platform==='youtube'?'Shorts':'Reels'} every <b>${s.delayMs}</b> ms.</p></div>
+      <div class="card"><h3>Quick Start</h3><p>Open the popup and click <span class="badge">START ▶</span>. Auto-scroll ${s.platform==='youtube'?'Shorts':'Reels'} every <b>${s.delayMs}</b> ms.</p>
+      <p>Autostart: <b>${s.autoscroll ? 'on' : 'off'}</b></p></div>
       <div class="card"><h3>Totals</h3><div class="grid cols-2" style="margin-top:8px;"><div class="badge">All: ${db.length}</div><div class="badge">YouTube: ${counts.youtube||0}</div><div class="badge">Instagram: ${counts.instagram||0}</div></div></div>
       <div class="card"><h3>Exports</h3><div class="grid cols-2" style="margin-top:8px;"><button class="button" id="exportAll">Export All JSON</button><button class="button" id="exportIG">Export Instagram JSON</button></div></div>
     </div>
@@ -82,6 +83,7 @@ async function renderSettings(){
           <input type="number" id="delay" min="250" step="50" value="${s.delayMs}"/>
         </label>
         <label class="checkbox-row" style="margin-top:8px;"><input type="checkbox" id="minimized" ${s.minimized?'checked':''}/> Run in minimized window</label>
+        <label class="checkbox-row"><input type="checkbox" id="autoscroll" ${s.autoscroll?'checked':''}/> Autostart on browser launch</label>
         <div style="margin-top:10px;"><button class="button primary" id="saveScroll">Save</button></div>
       </div>
     </div>`;
@@ -90,8 +92,8 @@ async function renderSettings(){
     await saveSettings({appearance:{theme, density}}); applyTheme(theme); alert('Saved!');
   });
   document.getElementById('saveScroll').addEventListener('click', async ()=>{
-    const platform = document.getElementById('platform').value; const delay = Number(document.getElementById('delay').value); const minimized = document.getElementById('minimized').checked;
-    await saveSettings({platform, delayMs: delay, minimized}); alert('Saved!');
+    const platform = document.getElementById('platform').value; const delay = Number(document.getElementById('delay').value); const minimized = document.getElementById('minimized').checked; const autoscroll = document.getElementById('autoscroll').checked;
+    await saveSettings({platform, delayMs: delay, minimized, autoscroll}); alert('Saved!');
   });
 }
 
